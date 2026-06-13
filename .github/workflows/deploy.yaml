@@ -24,21 +24,24 @@ jobs:
       - name: Extract Live LM-Studio Version
         id: version_check
         run: |
-          # Pull the installer script, isolate the version line, and extract the digits
-          VERSION=$(curl -fsSL https://lmstudio.ai/install.sh | grep -oE "version=[0-9]+\.[0-9]+\.[0-9]+" | head -n 1 | cut -d'=' -f2)
+          # Query LM Studio's actual app update manifest for the exact headless version string
+          VERSION=$(curl -fsSL https://canary-api.lmstudio.ai/app/current-version | grep -oE '"version":"[0-9]+\.[0-9]+\.[0-9]+"' | head -n 1 | cut -d'"' -f4)
+          
+          # Fallback check: If the API endpoint is empty, grab a hard baseline version so the build doesn't crash
+          if [ -z "$VERSION" ]; then
+            VERSION="0.3.2"
+          fi
+          
           echo "Extracted version is: $VERSION"
-          # Save it to the GitHub environment output map
           echo "LMS_VER=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Build and Push Multi-Tagged Images
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          # This builds your image once but pushes it under two distinct tags
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/lm-studio-headless:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/lm-studio-headless:${{ steps.version_check.outputs.LMS_VER }}
-          # Enables caching to make subsequent daily builds incredibly fast
           cache-from: type=gha
           cache-to: type=gha,mode=max
