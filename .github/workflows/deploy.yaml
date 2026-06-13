@@ -5,6 +5,10 @@ on:
     - cron: '0 0 * * *' # Triggers automatically every night at midnight UTC
   workflow_dispatch:      # Grants you a manual "Run Workflow" button in the GitHub UI
 
+# Suppress Node 20 warnings by forcing the runner environment to Node 24
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   check-and-publish:
     runs-on: ubuntu-latest
@@ -24,10 +28,8 @@ jobs:
       - name: Extract Live LM-Studio Version
         id: version_check
         run: |
-          # Query LM Studio's actual app update manifest for the exact headless version string
           VERSION=$(curl -fsSL https://canary-api.lmstudio.ai/app/current-version | grep -oE '"version":"[0-9]+\.[0-9]+\.[0-9]+"' | head -n 1 | cut -d'"' -f4)
           
-          # Fallback check: If the API endpoint is empty, grab a hard baseline version so the build doesn't crash
           if [ -z "$VERSION" ]; then
             VERSION="0.3.2"
           fi
@@ -39,6 +41,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: ./Dockerfile  # Explicitly points to the root Dockerfile
           push: true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/lm-studio-headless:latest
